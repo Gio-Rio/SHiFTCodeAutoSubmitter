@@ -32,6 +32,7 @@ class SubmissionStatus(StrEnum):
     SUCCESSFUL = "successful"
     UNSUCCESSFUL = "unsuccessful"
     ALREADY_REDEEMED = "already_redeemed"
+    EXPIRED = "expired"
 
 
 class CodeSubmissionOutcome(BaseModel):

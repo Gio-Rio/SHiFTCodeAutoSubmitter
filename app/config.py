@@ -19,9 +19,23 @@ class Settings(BaseSettings):
     target_platform_button_text: str = "Redeem for PSN"
     check_button_text: str = "CHECK"
     invalid_code_message: str = "This SHiFT code does not exist"
+    expired_code_message: str = "This SHiFT code has expired"
+    between_submissions_pause_seconds: float = 0.75
+    # Max time to wait for CHECK to become enabled again (often disabled while the last request finishes).
+    check_button_ready_timeout_seconds: float = 90.0
     platform_selection_message: str = (
         "Please select the platform and game you'd like to receive your SHiFT rewards."
     )
+    # Substrings matched against page text (after CHECK); more resilient than one long exact line.
+    platform_selection_markers: list[str] = Field(
+        default_factory=lambda: [
+            "please select the platform",
+            "receive your shift rewards",
+        ]
+    )
+    code_validation_poll_interval_seconds: float = 0.25
+    code_validation_max_polls: int = 240
+    redemption_max_polls: int = 120
     already_redeemed_markers: list[str] = Field(
         default_factory=lambda: [
             "already redeemed",
@@ -33,6 +47,11 @@ class Settings(BaseSettings):
         default_factory=lambda: [
             "https://mentalmars.com/game-news/borderlands-4-shift-codes/",
             "https://shift.orcicorn.com/",
+            "https://mobalytics.gg/borderlands-4/shift-codes-borderlands-4",
+            "https://game8.co/games/Borderlands-4/archives/548406",
+            "https://xsmashx88x.github.io/bl4shiftcodes/",
+            "https://gamesradar.com/games/borderlands/borderlands-4-shift-codes-golden-keys/",
+            "https://shift.gearboxsoftware.com/home",
         ]
     )
 
