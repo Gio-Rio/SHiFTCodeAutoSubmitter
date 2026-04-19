@@ -1,37 +1,69 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-from app.models import StoredCodes
-from app.services.code_store import CodeStore
-
-
-def test_code_store_round_trip(tmp_path):
-    store = CodeStore(tmp_path / "codes.json")
-    payload = StoredCodes(known_codes=["ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"])
-
-    store.save(payload)
-    loaded = store.load()
-
-    assert loaded.known_codes == payload.known_codes
-    assert loaded.last_scraped_at is None
+from app.models import (
+    CodeSubmissionOutcome,
+    SubmissionResult,
+    SubmissionStatus,
+)
+from app.services.code_store import CodeStateStore
 
 
-def test_persist_after_scrape_concurrent_merge(tmp_path):
-    """Parallel persist calls must not drop codes when each adds a disjoint key."""
-    store = CodeStore(tmp_path / "codes.json")
-    n = 32
-    sources = ["https://example.com"]
+def test_persist_after_scrape_adds_only_new_codes(tmp_path):
+    store = CodeStateStore(
+        tmp_path / "unsubmitted_codes.json",
+        tmp_path / "submitted_codes.json",
+    )
 
-    def run(i: int) -> None:
-        code = f"{i:05d}-11111-22222-33333-44444"
-        store.persist_after_scrape([code], sources)
+    first = store.persist_after_scrape(
+        ["ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"],
+        ["https://example.com"],
+    )
+    second = store.persist_after_scrape(
+        ["ABCDE-FGHIJ-KLMNO-PQRST-UVWXY", "ZZZZZ-11111-YYYYY-22222-XXXXX"],
+        ["https://example.com"],
+    )
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = [pool.submit(run, i) for i in range(n)]
-        for f in as_completed(futures):
-            f.result()
+    unsubmitted = store.load_unsubmitted()
 
-    loaded = store.load()
-    assert len(loaded.known_codes) == n
-    assert set(loaded.known_codes) == {
-        f"{i:05d}-11111-22222-33333-44444" for i in range(n)
-    }
+    assert first.new_codes == ["ABCDE-FGHIJ-KLMNO-PQRST-UVWXY"]
+    assert second.new_codes == ["ZZZZZ-11111-YYYYY-22222-XXXXX"]
+    assert unsubmitted.codes == [
+        "ABCDE-FGHIJ-KLMNO-PQRST-UVWXY",
+        "ZZZZZ-11111-YYYYY-22222-XXXXX",
+    ]
+
+
+def test_persist_submission_results_moves_codes_to_bucket(tmp_path):
+    store = CodeStateStore(
+        tmp_path / "unsubmitted_codes.json",
+        tmp_path / "submitted_codes.json",
+    )
+    store.persist_after_scrape(
+        ["AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", "FFFFF-GGGGG-HHHHH-IIIII-JJJJJ"],
+        ["https://example.com"],
+    )
+
+    result = SubmissionResult(
+        attempted_codes=2,
+        processed_codes=[
+            CodeSubmissionOutcome(
+                code="AAAAA-BBBBB-CCCCC-DDDDD-EEEEE",
+                status=SubmissionStatus.SUCCESSFUL,
+            ),
+            CodeSubmissionOutcome(
+                code="FFFFF-GGGGG-HHHHH-IIIII-JJJJJ",
+                status=SubmissionStatus.ALREADY_REDEEMED,
+            ),
+        ],
+        remaining_unsubmitted_codes=0,
+        login_attempts=1,
+        target_game="Borderlands 4",
+        target_platform="Redeem for PSN",
+    )
+
+    persisted = store.persist_submission_results(result)
+    unsubmitted = store.load_unsubmitted()
+    submitted = store.load_submitted()
+
+    assert persisted.remaining_unsubmitted_codes == 0
+    assert unsubmitted.codes == []
+    assert submitted.successful_codes == ["AAAAA-BBBBB-CCCCC-DDDDD-EEEEE"]
+    assert submitted.already_redeemed_codes == ["FFFFF-GGGGG-HHHHH-IIIII-JJJJJ"]

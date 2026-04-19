@@ -1,23 +1,21 @@
 # SHiFTCodeAutoSubmitter
 
-Automatically search the web to find new SHiFT codes, save used keys (both real and non-real) in a JSON file, and eventually submit those keys to Gearbox.
-
-## Current scope
-
-This first pass only covers step 1: scraping the web for new Borderlands SHiFT codes and remembering which codes the app has already seen.
+Automatically search the web to find new SHiFT codes, queue unsubmitted ones, and submit them to Gearbox through an API-backed Playwright flow.
 
 ## Stack
 
 - FastAPI
 - httpx
 - BeautifulSoup
+- Playwright
 - JSON file persistence
 
 ## Endpoints
 
 - `GET /health` returns a simple health status
-- `GET /codes` returns the currently known codes from local storage
-- `POST /scrape` fetches configured source pages, extracts SHiFT-style codes, stores newly discovered ones, and returns the scrape result
+- `GET /codes` returns both unsubmitted and submitted code state
+- `POST /scrape` fetches configured source pages, extracts SHiFT-style codes, and appends only brand-new ones to `data/unsubmitted_codes.json`
+- `POST /submit-codes` logs into SHiFT, checks each queued code, redeems valid ones for the configured game/platform, and moves processed codes into `data/submitted_codes.json`
 
 ## Local setup
 
@@ -26,6 +24,7 @@ This first pass only covers step 1: scraping the web for new Borderlands SHiFT c
 
 ```bash
 pip install -e ".[dev]"
+playwright install chromium
 ```
 
 3. Copy `.env.example` to `.env` if you want to override defaults.
@@ -37,10 +36,8 @@ uvicorn app.main:app --reload
 
 ## Notes
 
-- Known codes are stored in `data/discovered_codes.json`.
+- New scraper discoveries land in `data/unsubmitted_codes.json`.
+- Submission results are stored in `data/submitted_codes.json` under `successful_codes`, `unsuccessful_codes`, and `already_redeemed_codes`.
+- The Playwright flow uses `.env` values for `USERNAME`, `PASSWORD`, `TARGET_GAME`, and `TARGET_PLATFORM_BUTTON_TEXT`.
+- Login retries default to `3`, and the browser defaults to visible mode with `HEADLESS_BROWSER=false`.
 - The scraper uses a SHiFT code pattern of `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`.
-- Two starter source URLs are configured in `app/config.py` and can be moved into env configuration later if you want.
-
-## Next step
-
-After this, the natural next slice is step 2: submitting newly discovered codes against a Gearbox account using credentials stored in `.env`, then splitting results into `successful_codes` and `unsuccessful_codes`.

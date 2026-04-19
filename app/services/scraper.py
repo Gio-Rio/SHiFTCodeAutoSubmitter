@@ -6,14 +6,14 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.models import ScrapeResult
-from app.services.code_store import CodeStore
+from app.services.code_store import CodeStateStore
 
 
 SHIFT_CODE_PATTERN = re.compile(r"\b[A-Z0-9]{5}(?:-[A-Z0-9]{5}){4}\b")
 
 
 class ShiftCodeScraper:
-    def __init__(self, store: CodeStore, timeout_seconds: float = 15.0) -> None:
+    def __init__(self, store: CodeStateStore, timeout_seconds: float = 15.0) -> None:
         self.store = store
         self.timeout_seconds = timeout_seconds
 
