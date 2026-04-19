@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     code_store_path: Path = Path("data/discovered_codes.json")
     request_timeout_seconds: float = 15.0
+    # Reserved for future Gearbox / SHiFT redemption; optional so startup works without them.
+    username: str | None = None
+    password: str | None = None
     scrape_sources: list[str] = Field(
         default_factory=lambda: [
             "https://mentalmars.com/game-news/borderlands-4-shift-codes/",
